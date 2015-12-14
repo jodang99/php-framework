@@ -1,51 +1,58 @@
-<?php 
-class Controller{
+<?php
+
+abstract class Controller{
+	protected $controller_name;
+	protected $action_name;
+	protected $application;
+	protected $request;
+	protected $response;
+	protected $session;
+	protected $db_manager;
 	
-	protected $routes;
-	
-	public function __construct($definitions)
-	{
-		$this->routes = $this->compileRoutes($definitions);
-	}
-	
-	public function compileRoutes($definitions)
-	{
-		$routes = array();
+	public function __construct($application) {
+		$this->controller_name = strtolower(substr(get_class($this),0,-10));
 		
-		foreach ($definitions as $url => $params){
-			
-			$tokens = explode('/',ltrim($url,'/'));
-			foreach ($tokens as $i => $token){
-				if (0=== strpos($token, ':')){
-					$name = substr($token,1);
-					$token = '(?P<'.$name.'>[^/]+)';
-				}
-				$tokens[$i]=$token;
-			}
-			$pattern = '/'.implode('/',$tokens);
-			$routes[$pattern]=$params;
-		}
-		return $routes;
+		$this->application = $application;
+		$this->request = $application->getRequest();
+		$this->response = $application->getResponse();
+		$this->session = $application->getSession();
+		$this->db_manager = $application->getDbManager();
 	}
 	
-	public function resolve($path_info)
+	public function run($action,$params=array()) {
+		$this->action_name = $action;
+		
+		$action_method = $action.'Action';
+		if (!method_exists($this,$action_method))
+		{
+			$this->forward404();
+		}
+		
+		$content = $this->$action_method($params);//$this->$ac... 가변함수(실제실행)
+		return $content;
+	}
+	
+	protected function render($variables = array(),$template = null, $layout='layout')
 	{
-		if ('/' !== substr($path_info,0,1))
-		{
-			$path_info = '/'.$path_info;
+		$defaults = array(
+				'request'=>$this->request,
+				'base_url'=>$this->request->getBaseUrl(),
+				'session'=>$this->session,
+		);
+		
+		$view = new View($this->application->getViewDir(),$defaults);
+		
+		if (is_null($template)){
+			$template = $this->action_name;
 		}
-		foreach ($this->routes as $pattern => $params)
-		{
-			if (preg_match('#^'.$pattern.'$#',$path_info,$matches))
-			{
-				$params = array_merge($params,$matches);
-				
-				return $params;
-			}
-		}
-		return false;
+		$path = $this->controller_name.'/'.$template;
+		return $view->render($path,$variables,$layout);
 	}
 	
+	protected function forward404()
+	{
+		throw new HttpNotFoundException('Forwarded 404 page from '.$this->controller_name,'/'.$this->action_name);
+	}
 }
 
 ?>
