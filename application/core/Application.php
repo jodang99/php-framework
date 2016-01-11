@@ -93,7 +93,7 @@ abstract class Application
 			if (!is_readable($controller_fie)){
 				return false;
 			}else{
-				require_once $controller_file;
+				require_once $controller_file;//Loading controller file here..
 				if (!class_exists($controller_class)){
 					return false;
 				}
